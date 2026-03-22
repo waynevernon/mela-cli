@@ -28,11 +28,13 @@ from mela_cli.store import (
 from mela_cli.utils import json_dumps, slugify
 
 ENV_EPILOG = """
-Environment variables:
-  MELA_APP_PATH
-  MELA_DB_PATH
-  MELA_SUPPORT_DIR
-  MELA_COMPRESSION_TOOL
+Environment variables (each overrides the corresponding flag):
+  MELA_APP_PATH          path to Mela.app
+  MELA_DB_PATH           path to Curcuma.sqlite
+  MELA_SUPPORT_DIR       path to the Core Data external blob directory
+  MELA_COMPRESSION_TOOL  path or name of the compression_tool binary
+
+Run 'mela <command> --help' for command-specific options and examples.
 """
 
 
@@ -59,19 +61,61 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    list_parser = subparsers.add_parser("list", help="List recipes in the catalog.")
+    list_parser = subparsers.add_parser(
+        "list",
+        help="List recipes in the catalog.",
+        description=(
+            "List recipes as a table, JSON array, or CSV. Columns: PK, F (★ favorite), "
+            "W (◎ want-to-cook), Title, Tags. Combine filters freely."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  mela list                          # all recipes\n"
+            "  mela list -q soup                  # text search\n"
+            "  mela list -f -t Breakfast          # favorites tagged Breakfast\n"
+            "  mela list --format json            # JSON array of summaries\n"
+            "  mela list --format csv             # CSV export of full summary\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     list_parser.add_argument("-q", "--query", help="Case-insensitive text search.")
     add_recipe_filters(list_parser)
     add_summary_output_option(list_parser)
     list_parser.set_defaults(handler=handle_list)
 
-    search_parser = subparsers.add_parser("search", help="Search recipes by text.")
+    search_parser = subparsers.add_parser(
+        "search",
+        help="Search recipes by text (alias for 'list --query').",
+        description="Search recipes by text query. Equivalent to 'mela list --query QUERY'.",
+        epilog=(
+            "Examples:\n"
+            "  mela search soup\n"
+            "  mela search soup -f --format json\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     search_parser.add_argument("query", help="Case-insensitive query string.")
     add_recipe_filters(search_parser)
     add_summary_output_option(search_parser)
     search_parser.set_defaults(handler=handle_list)
 
-    show_parser = subparsers.add_parser("show", help="Show one recipe.")
+    show_parser = subparsers.add_parser(
+        "show",
+        help="Show one recipe.",
+        description=(
+            "Show a single recipe. Accepts a numeric PK, exact title, Mela record ID, "
+            "or a unique prefix/fragment of either. Ambiguous selectors fail with suggested PKs."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  mela show 42\n"
+            "  mela show 'Egg Bites'\n"
+            "  mela show egg            # unique title fragment\n"
+            "  mela show 42 --format markdown\n"
+            "  mela show 42 --format json\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     show_parser.add_argument(
         "selector",
         help="Recipe PK, exact record ID, exact title, unique record-ID prefix, or unique title fragment.",
@@ -80,11 +124,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         choices=("text", "markdown", "json"),
         default="text",
-        help="Output format (default: text).",
+        help="Output format: text (terminal-friendly, default), markdown, or json (full recipe object).",
     )
     show_parser.set_defaults(handler=handle_show)
 
-    export_parser = subparsers.add_parser("export", help="Export one recipe.")
+    export_parser = subparsers.add_parser(
+        "export",
+        help="Export one recipe to a file.",
+        description=(
+            "Export a single recipe to a file. The default format is melarecipe — a JSON file "
+            "that Mela can import directly via File > Import. Use json for automation or markdown "
+            "for plain-text archiving."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  mela export 'Egg Bites'                      # .melarecipe in current dir\n"
+            "  mela export 42 -o ./exports                  # write to ./exports/\n"
+            "  mela export 42 --format json --compact       # minified JSON\n"
+            "  mela export 42 --format markdown             # Markdown file\n"
+            "  mela export 42 --filename-style id           # filename is the record UUID\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     export_parser.add_argument(
         "selector",
         help="Recipe PK, exact record ID, exact title, unique record-ID prefix, or unique title fragment.",
@@ -93,21 +154,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         choices=("melarecipe", "json", "markdown"),
         default="melarecipe",
-        help="Export format (default: melarecipe).",
+        help=(
+            "Export format: melarecipe (Mela-importable JSON, default), "
+            "json (full recipe object), or markdown."
+        ),
     )
     export_parser.add_argument(
         "-o",
         "--output",
         type=Path,
         default=Path("."),
-        help="Directory to write exported files (default: current directory).",
+        help="Directory to write the exported file (default: current directory).",
     )
     export_parser.add_argument(
         "--filename-style",
         choices=("slug", "id", "id-slug"),
         default="slug",
         dest="filename_style",
-        help="Filename style: slug (title-based, default), id (record UUID), or id-slug.",
+        help=(
+            "Filename style: slug (title-based slug, default), id (record UUID), "
+            "or id-slug (UUID + title slug)."
+        ),
     )
     export_parser.add_argument(
         "--compact",
@@ -116,21 +183,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export_parser.set_defaults(handler=handle_export)
 
-    export_all_parser = subparsers.add_parser("export-all", help="Bulk export recipes to a directory.")
-    export_all_parser.add_argument("-q", "--query", help="Text search to filter exported recipes.")
+    export_all_parser = subparsers.add_parser(
+        "export-all",
+        help="Bulk export recipes to a directory.",
+        description=(
+            "Export multiple recipes to a directory, one file per recipe. "
+            "Accepts the same filters as 'list'. The default format is melarecipe — "
+            "a JSON file that Mela can import directly via File > Import."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  mela export-all -o ./exports                     # all recipes\n"
+            "  mela export-all -t Dessert -o ./desserts         # one tag\n"
+            "  mela export-all -f --format markdown -o ./md    # favorites as Markdown\n"
+            "  mela export-all -q soup --filename-style id-slug # UUID+title filenames\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    export_all_parser.add_argument("-q", "--query", help="Case-insensitive text search to filter exported recipes.")
     add_recipe_filters(export_all_parser)
     export_all_parser.add_argument(
         "--format",
         choices=("melarecipe", "json", "markdown"),
         default="melarecipe",
-        help="Export format (default: melarecipe).",
+        help=(
+            "Export format: melarecipe (Mela-importable JSON, default), "
+            "json (full recipe object), or markdown."
+        ),
     )
     export_all_parser.add_argument(
         "--filename-style",
         choices=("slug", "id", "id-slug"),
         default="slug",
         dest="filename_style",
-        help="Filename style: slug (title-based, default), id (record UUID), or id-slug (UUID + title).",
+        help=(
+            "Filename style: slug (title-based slug, default), id (record UUID), "
+            "or id-slug (UUID + title slug)."
+        ),
     )
     export_all_parser.add_argument(
         "--compact",
@@ -146,15 +235,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export_all_parser.set_defaults(handler=handle_export_all)
 
-    tags_parser = subparsers.add_parser("tags", help="List tags and usage counts.")
+    tags_parser = subparsers.add_parser(
+        "tags",
+        help="List tags and usage counts.",
+        description="List all tags with recipe counts, sorted by count descending.",
+    )
     add_table_json_output_option(tags_parser)
     tags_parser.set_defaults(handler=handle_tags)
 
-    stats_parser = subparsers.add_parser("stats", help="Show catalog statistics.")
+    stats_parser = subparsers.add_parser(
+        "stats",
+        help="Show catalog statistics.",
+        description="Show aggregate statistics for the catalog: recipe count, favorites, images, links, and tags.",
+    )
     add_table_json_output_option(stats_parser)
     stats_parser.set_defaults(handler=handle_stats)
 
-    doctor_parser = subparsers.add_parser("doctor", help="Diagnose setup and path discovery.")
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Diagnose setup and path discovery.",
+        description=(
+            "Show what mela discovered about your Mela install: app path, database path, "
+            "support directory, compression tool, and whether the catalog is readable. "
+            "Run this first if any command fails to find the database."
+        ),
+    )
     add_table_json_output_option(doctor_parser)
     doctor_parser.set_defaults(handler=handle_doctor)
 
