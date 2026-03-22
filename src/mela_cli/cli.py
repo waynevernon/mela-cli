@@ -63,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_summary_output_option(list_parser)
     list_parser.set_defaults(handler=handle_list)
 
-    search_parser = subparsers.add_parser("search", help="Alias for 'list --query'.")
+    search_parser = subparsers.add_parser("search", help="Search recipes by text.")
     search_parser.add_argument("query", help="Case-insensitive query string.")
     add_recipe_filters(search_parser)
     add_summary_output_option(search_parser)
@@ -114,7 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export_parser.set_defaults(handler=handle_export)
 
-    export_all_parser = subparsers.add_parser("export-all", help="Export multiple recipes.")
+    export_all_parser = subparsers.add_parser("export-all", help="Bulk export recipes to a directory.")
     export_all_parser.add_argument("-q", "--query", help="Text search to filter exported recipes.")
     add_recipe_filters(export_all_parser)
     export_all_parser.add_argument(
@@ -152,7 +152,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_table_json_output_option(stats_parser)
     stats_parser.set_defaults(handler=handle_stats)
 
-    doctor_parser = subparsers.add_parser("doctor", help="Inspect discovery and runtime prerequisites.")
+    doctor_parser = subparsers.add_parser("doctor", help="Diagnose setup and path discovery.")
     add_table_json_output_option(doctor_parser)
     doctor_parser.set_defaults(handler=handle_doctor)
 
