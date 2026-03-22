@@ -1,8 +1,30 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import unicodedata
 from typing import Any
+
+
+def use_color() -> bool:
+    return sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+
+
+def bold(s: str) -> str:
+    return f"\033[1m{s}\033[0m" if use_color() else s
+
+
+def dim(s: str) -> str:
+    return f"\033[2m{s}\033[0m" if use_color() else s
+
+
+def green(s: str) -> str:
+    return f"\033[32m{s}\033[0m" if use_color() else s
+
+
+def red(s: str) -> str:
+    return f"\033[31m{s}\033[0m" if use_color() else s
 
 
 def slugify(value: str) -> str:

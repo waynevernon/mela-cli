@@ -5,7 +5,7 @@ import io
 
 from mela_cli.discovery import DiscoveryResult
 from mela_cli.store import SUMMARY_FIELD_NAMES, CatalogStats, Recipe, RecipeSummary, TagSummary
-from mela_cli.utils import json_dumps, shorten
+from mela_cli.utils import bold, dim, green, json_dumps, shorten
 
 
 def render_summary_table(recipes: list[RecipeSummary]) -> str:
@@ -13,20 +13,19 @@ def render_summary_table(recipes: list[RecipeSummary]) -> str:
         return "No recipes found.\n"
 
     title_width = min(max(len(recipe.title) for recipe in recipes), 48)
-    lines = [
-        f"{'PK':>4}  {'F':1}  {'W':1}  {'Title':<{title_width}}  Tags",
-        f"{'-' * 4}  {'-'}  {'-'}  {'-' * title_width}  {'-' * 20}",
-    ]
+    header = f"{'PK':>4}  {'★':1}  {'◎':1}  {'Title':<{title_width}}  Tags"
+    rule = dim(f"{'─' * 4}  {'─'}  {'─'}  {'─' * title_width}  {'─' * 20}")
+    lines = [bold(header), rule]
     for recipe in recipes:
         lines.append(
             f"{recipe.pk:>4}  "
-            f"{'Y' if recipe.favorite else '.':1}  "
-            f"{'Y' if recipe.want_to_cook else '.':1}  "
+            f"{'★' if recipe.favorite else ' ':1}  "
+            f"{'◎' if recipe.want_to_cook else ' ':1}  "
             f"{shorten(recipe.title, title_width):<{title_width}}  "
             f"{', '.join(recipe.tags)}"
         )
     lines.append("")
-    lines.append(f"{len(recipes)} recipe(s)")
+    lines.append(dim(f"{len(recipes)} recipe(s)"))
     return "\n".join(lines) + "\n"
 
 
@@ -40,12 +39,12 @@ def render_summary_csv(recipes: list[RecipeSummary]) -> str:
 
 
 def render_recipe_text(recipe: Recipe) -> str:
-    lines: list[str] = [recipe.title, "=" * len(recipe.title), ""]
+    lines: list[str] = [bold(recipe.title), dim("─" * len(recipe.title)), ""]
     lines.extend(
         [
             f"ID: {recipe.identifier}",
-            f"Favorite: {'yes' if recipe.favorite else 'no'}",
-            f"Want to cook: {'yes' if recipe.want_to_cook else 'no'}",
+            f"Favorite: {yes_no(recipe.favorite)}",
+            f"Want to cook: {yes_no(recipe.want_to_cook)}",
         ]
     )
     if recipe.tags:
@@ -66,15 +65,15 @@ def render_recipe_text(recipe: Recipe) -> str:
     lines.append("")
 
     if recipe.text:
-        lines.extend(["Summary", "-------", recipe.text.strip(), ""])
+        lines.extend([bold("Summary"), dim("───────"), recipe.text.strip(), ""])
     if recipe.ingredients:
-        lines.extend(["Ingredients", "-----------", recipe.ingredients.strip(), ""])
+        lines.extend([bold("Ingredients"), dim("───────────"), recipe.ingredients.strip(), ""])
     if recipe.instructions:
-        lines.extend(["Instructions", "------------", recipe.instructions.strip(), ""])
+        lines.extend([bold("Instructions"), dim("────────────"), recipe.instructions.strip(), ""])
     if recipe.notes:
-        lines.extend(["Notes", "-----", recipe.notes.strip(), ""])
+        lines.extend([bold("Notes"), dim("─────"), recipe.notes.strip(), ""])
     if recipe.nutrition:
-        lines.extend(["Nutrition", "---------", recipe.nutrition.strip(), ""])
+        lines.extend([bold("Nutrition"), dim("─────────"), recipe.nutrition.strip(), ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -120,14 +119,13 @@ def render_tag_table(tags: list[TagSummary]) -> str:
     if not tags:
         return "No tags found.\n"
     width = min(max(len(tag.name) for tag in tags), 48)
-    lines = [
-        f"{'Count':>5}  {'Tag':<{width}}",
-        f"{'-' * 5}  {'-' * width}",
-    ]
+    header = f"{'Count':>5}  {'Tag':<{width}}"
+    rule = dim(f"{'─' * 5}  {'─' * width}")
+    lines = [bold(header), rule]
     for tag in tags:
         lines.append(f"{tag.count:>5}  {shorten(tag.name, width):<{width}}")
     lines.append("")
-    lines.append(f"{len(tags)} tag(s)")
+    lines.append(dim(f"{len(tags)} tag(s)"))
     return "\n".join(lines) + "\n"
 
 
@@ -179,11 +177,11 @@ def render_key_value_rows(rows: list[tuple[str, str]]) -> str:
     for label, value in rows:
         if "\n" in value:
             first, *rest = value.splitlines()
-            lines.append(f"{label:<{width}} : {first}")
+            lines.append(f"{dim(label):<{width}} : {first}")
             for item in rest:
                 lines.append(f"{'':<{width}}   {item}")
         else:
-            lines.append(f"{label:<{width}} : {value}")
+            lines.append(f"{dim(f'{label:<{width}}')} : {value}")
     return "\n".join(lines) + "\n"
 
 
@@ -192,4 +190,4 @@ def stringify_path(path: object) -> str:
 
 
 def yes_no(value: bool) -> str:
-    return "yes" if value else "no"
+    return green("yes") if value else dim("no")
