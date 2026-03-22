@@ -43,16 +43,18 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    parser.add_argument("--app-path", type=Path, help="Path to the installed Mela.app bundle.")
-    parser.add_argument("--db-path", type=Path, help="Path to Curcuma.sqlite.")
+    parser.add_argument("--app-path", type=Path, metavar="PATH", help="Override path to Mela.app.")
+    parser.add_argument("--db-path", type=Path, metavar="PATH", help="Override path to Curcuma.sqlite.")
     parser.add_argument(
         "--support-dir",
         type=Path,
-        help="Path to Core Data external blob storage (_EXTERNAL_DATA).",
+        metavar="PATH",
+        help="Override path to the Core Data external blob directory (_EXTERNAL_DATA).",
     )
     parser.add_argument(
         "--compression-tool",
-        help="Path or command name for macOS compression_tool.",
+        metavar="CMD",
+        help="Override path or name of the macOS compression_tool binary.",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -78,7 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         choices=("text", "markdown", "json"),
         default="text",
-        help="Output format.",
+        help="Output format (default: text).",
     )
     show_parser.set_defaults(handler=handle_show)
 
@@ -91,7 +93,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         choices=("melarecipe", "json", "markdown"),
         default="melarecipe",
-        help="Export format.",
+        help="Export format (default: melarecipe).",
     )
     export_parser.add_argument(
         "-o",
@@ -121,19 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         choices=("melarecipe", "json", "markdown"),
         default="melarecipe",
-        help="Export format.",
-    )
-    export_all_parser.add_argument(
-        "-o",
-        "--output",
-        type=Path,
-        default=Path("."),
-        help="Directory to write exported files (default: current directory).",
-    )
-    export_all_parser.add_argument(
-        "--compact",
-        action="store_true",
-        help="Minify JSON output for melarecipe/json exports; ignored for markdown.",
+        help="Export format (default: melarecipe).",
     )
     export_all_parser.add_argument(
         "--filename-style",
@@ -141,6 +131,18 @@ def build_parser() -> argparse.ArgumentParser:
         default="slug",
         dest="filename_style",
         help="Filename style: slug (title-based, default), id (record UUID), or id-slug (UUID + title).",
+    )
+    export_all_parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Minify JSON output for melarecipe/json exports; ignored for markdown.",
+    )
+    export_all_parser.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=Path("."),
+        help="Directory to write exported files (default: current directory).",
     )
     export_all_parser.set_defaults(handler=handle_export_all)
 
@@ -173,6 +175,7 @@ def add_recipe_filters(parser: argparse.ArgumentParser) -> None:
         action="append",
         default=[],
         dest="tags",
+        metavar="TAG",
         help="Filter by tag. Can be passed multiple times.",
     )
     parser.add_argument("-n", "--limit", type=int, help="Maximum number of recipes to return.")
@@ -183,7 +186,7 @@ def add_summary_output_option(parser: argparse.ArgumentParser) -> None:
         "--format",
         choices=("table", "json", "csv"),
         default="table",
-        help="Output format.",
+        help="Output format (default: table).",
     )
 
 
@@ -192,7 +195,7 @@ def add_table_json_output_option(parser: argparse.ArgumentParser) -> None:
         "--format",
         choices=("table", "json"),
         default="table",
-        help="Output format.",
+        help="Output format (default: table).",
     )
 
 
