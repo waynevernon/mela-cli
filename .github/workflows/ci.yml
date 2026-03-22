@@ -8,8 +8,8 @@ jobs:
   test:
     runs-on: macos-latest
     env:
-      PIPX_HOME: ${{ runner.temp }}/pipx-home
-      PIPX_BIN_DIR: ${{ runner.temp }}/pipx-bin
+      PIPX_HOME: ${{ github.workspace }}/.pipx-home
+      PIPX_BIN_DIR: ${{ github.workspace }}/.pipx-bin
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
