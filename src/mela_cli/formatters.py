@@ -83,7 +83,7 @@ def render_recipe_text(recipe: Recipe) -> str:
     if recipe.ingredients:
         lines.extend([section_rule("Ingredients"), "", *_indent(recipe.ingredients.strip()), ""])
     if recipe.instructions:
-        lines.extend([section_rule("Instructions"), "", *_indent(recipe.instructions.strip()), ""])
+        lines.extend([section_rule("Instructions"), "", *_indent_steps(recipe.instructions.strip()), ""])
     if recipe.notes:
         lines.extend([section_rule("Notes"), "", *_indent(recipe.notes.strip()), ""])
     if recipe.nutrition:
@@ -94,6 +94,16 @@ def render_recipe_text(recipe: Recipe) -> str:
 
 def _indent(text: str, prefix: str = "  ") -> list[str]:
     return [prefix + line if line.strip() else "" for line in text.splitlines()]
+
+
+def _indent_steps(text: str, prefix: str = "  ") -> list[str]:
+    """Like _indent, but inserts a blank line before each step after the first."""
+    result: list[str] = []
+    for line in text.splitlines():
+        if line.strip() and result and result[-1] != "":
+            result.append("")
+        result.append(prefix + line if line.strip() else "")
+    return result
 
 
 def render_recipe_markdown(recipe: Recipe) -> str:
