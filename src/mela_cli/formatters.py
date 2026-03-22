@@ -13,20 +13,16 @@ def render_summary_table(recipes: list[RecipeSummary]) -> str:
         return "No recipes found.\n"
 
     title_width = min(max(len(recipe.title) for recipe in recipes), 48)
-    header = f"{'PK':>4}  {'Title':<{title_width + 2}}  Tags"
-    rule = dim(f"{'─' * 4}  {'─' * (title_width + 2)}  {'─' * 20}")
+    header = f"{'PK':>4}  {'F':<2}  {'W':<2}  {'Title':<{title_width}}  Tags"
+    rule = dim(f"{'─' * 4}  {'─' * 2}  {'─' * 2}  {'─' * title_width}  {'─' * 20}")
     lines = [bold(header), rule]
     for recipe in recipes:
-        if recipe.favorite:
-            indicator = yellow("★") + " "
-        elif recipe.want_to_cook:
-            indicator = cyan("◎") + " "
-        else:
-            indicator = "  "
+        fav = (yellow("★") + " ") if recipe.favorite else "  "
+        wtc = (cyan("◎") + " ") if recipe.want_to_cook else "  "
         title_plain = f"{shorten(recipe.title, title_width):<{title_width}}"
         title_out = bold(title_plain) if recipe.favorite else title_plain
         tags = dim(cyan(", ".join(recipe.tags))) if recipe.tags else ""
-        lines.append(f"{dim(f'{recipe.pk:>4}')}  {indicator}{title_out}  {tags}")
+        lines.append(f"{dim(f'{recipe.pk:>4}')}  {fav}  {wtc}  {title_out}  {tags}")
     lines.append("")
     count = len(recipes)
     lines.append(dim(f"{count} {'recipe' if count == 1 else 'recipes'}"))
