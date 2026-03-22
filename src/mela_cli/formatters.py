@@ -5,7 +5,7 @@ import io
 
 from mela_cli.discovery import DiscoveryResult
 from mela_cli.store import SUMMARY_FIELD_NAMES, CatalogStats, Recipe, RecipeSummary, TagSummary
-from mela_cli.utils import bold, dim, green, json_dumps, shorten
+from mela_cli.utils import bold, cyan, dim, green, json_dumps, mini_bar, red, section_rule, shorten, yellow
 
 
 def render_summary_table(recipes: list[RecipeSummary]) -> str:
@@ -13,19 +13,23 @@ def render_summary_table(recipes: list[RecipeSummary]) -> str:
         return "No recipes found.\n"
 
     title_width = min(max(len(recipe.title) for recipe in recipes), 48)
-    header = f"{'PK':>4}  {'★':1}  {'◎':1}  {'Title':<{title_width}}  Tags"
-    rule = dim(f"{'─' * 4}  {'─'}  {'─'}  {'─' * title_width}  {'─' * 20}")
+    header = f"{'PK':>4}  {'Title':<{title_width + 2}}  Tags"
+    rule = dim(f"{'─' * 4}  {'─' * (title_width + 2)}  {'─' * 20}")
     lines = [bold(header), rule]
     for recipe in recipes:
-        lines.append(
-            f"{recipe.pk:>4}  "
-            f"{'★' if recipe.favorite else ' ':1}  "
-            f"{'◎' if recipe.want_to_cook else ' ':1}  "
-            f"{shorten(recipe.title, title_width):<{title_width}}  "
-            f"{', '.join(recipe.tags)}"
-        )
+        if recipe.favorite:
+            indicator = yellow("★") + " "
+        elif recipe.want_to_cook:
+            indicator = cyan("◎") + " "
+        else:
+            indicator = "  "
+        title_plain = f"{shorten(recipe.title, title_width):<{title_width}}"
+        title_out = bold(title_plain) if recipe.favorite else title_plain
+        tags = dim(cyan(", ".join(recipe.tags))) if recipe.tags else ""
+        lines.append(f"{dim(f'{recipe.pk:>4}')}  {indicator}{title_out}  {tags}")
     lines.append("")
-    lines.append(dim(f"{len(recipes)} recipe(s)"))
+    count = len(recipes)
+    lines.append(dim(f"{count} {'recipe' if count == 1 else 'recipes'}"))
     return "\n".join(lines) + "\n"
 
 
@@ -39,42 +43,61 @@ def render_summary_csv(recipes: list[RecipeSummary]) -> str:
 
 
 def render_recipe_text(recipe: Recipe) -> str:
-    lines: list[str] = [bold(recipe.title), dim("─" * len(recipe.title)), ""]
-    lines.extend(
-        [
-            f"ID: {recipe.identifier}",
-            f"Favorite: {yes_no(recipe.favorite)}",
-            f"Want to cook: {yes_no(recipe.want_to_cook)}",
-        ]
-    )
+    rule_width = max(len(recipe.title), 48)
+    lines: list[str] = [bold(recipe.title), dim("─" * rule_width), ""]
+
+    # Compact metadata block
+    meta: list[str] = []
+
+    flags: list[str] = []
+    if recipe.favorite:
+        flags.append(f"{yellow('★')} Favorite")
+    if recipe.want_to_cook:
+        flags.append(f"{cyan('◎')} Want to cook")
     if recipe.tags:
-        lines.append(f"Tags: {', '.join(recipe.tags)}")
-    if recipe.link:
-        lines.append(f"Link: {recipe.link}")
-    if recipe.created_at:
-        lines.append(f"Added: {recipe.created_at}")
+        flags.append(cyan(", ".join(recipe.tags)))
+    if flags:
+        meta.append("  " + dim("  ·  ").join(flags))
+
+    times: list[str] = []
     if recipe.prep_time:
-        lines.append(f"Prep time: {recipe.prep_time}")
+        times.append(f"Prep {recipe.prep_time}")
     if recipe.cook_time:
-        lines.append(f"Cook time: {recipe.cook_time}")
+        times.append(f"Cook {recipe.cook_time}")
     if recipe.total_time:
-        lines.append(f"Total time: {recipe.total_time}")
+        times.append(f"Total {recipe.total_time}")
     if recipe.yield_value:
-        lines.append(f"Yield: {recipe.yield_value}")
-    lines.append(f"Images: {len(recipe.images)}")
+        times.append(f"Serves {recipe.yield_value}")
+    if times:
+        meta.append(dim("  " + "  ·  ".join(times)))
+
+    link_parts: list[str] = []
+    if recipe.link:
+        link_parts.append(recipe.link)
+    if recipe.created_at:
+        link_parts.append(f"Added {recipe.created_at}")
+    if link_parts:
+        meta.append(dim("  " + "  ·  ".join(link_parts)))
+
+    lines.extend(meta)
     lines.append("")
 
     if recipe.text:
-        lines.extend([bold("Summary"), dim("───────"), recipe.text.strip(), ""])
+        lines.extend([section_rule("Summary"), "", *_indent(recipe.text.strip()), ""])
     if recipe.ingredients:
-        lines.extend([bold("Ingredients"), dim("───────────"), recipe.ingredients.strip(), ""])
+        lines.extend([section_rule("Ingredients"), "", *_indent(recipe.ingredients.strip()), ""])
     if recipe.instructions:
-        lines.extend([bold("Instructions"), dim("────────────"), recipe.instructions.strip(), ""])
+        lines.extend([section_rule("Instructions"), "", *_indent(recipe.instructions.strip()), ""])
     if recipe.notes:
-        lines.extend([bold("Notes"), dim("─────"), recipe.notes.strip(), ""])
+        lines.extend([section_rule("Notes"), "", *_indent(recipe.notes.strip()), ""])
     if recipe.nutrition:
-        lines.extend([bold("Nutrition"), dim("─────────"), recipe.nutrition.strip(), ""])
+        lines.extend([section_rule("Nutrition"), "", *_indent(recipe.nutrition.strip()), ""])
+
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _indent(text: str, prefix: str = "  ") -> list[str]:
+    return [prefix + line if line.strip() else "" for line in text.splitlines()]
 
 
 def render_recipe_markdown(recipe: Recipe) -> str:
@@ -118,75 +141,98 @@ def render_recipe_markdown(recipe: Recipe) -> str:
 def render_tag_table(tags: list[TagSummary]) -> str:
     if not tags:
         return "No tags found.\n"
-    width = min(max(len(tag.name) for tag in tags), 48)
-    header = f"{'Count':>5}  {'Tag':<{width}}"
-    rule = dim(f"{'─' * 5}  {'─' * width}")
+    name_width = min(max(len(tag.name) for tag in tags), 48)
+    max_count = max(tag.count for tag in tags)
+    header = f"{'Count':>5}  {'Bar':<20}  {'Tag':<{name_width}}"
+    rule = dim(f"{'─' * 5}  {'─' * 20}  {'─' * name_width}")
     lines = [bold(header), rule]
     for tag in tags:
-        lines.append(f"{tag.count:>5}  {shorten(tag.name, width):<{width}}")
+        bar = mini_bar(tag.count, max_count, width=20)
+        lines.append(f"{tag.count:>5}  {bar}  {cyan(shorten(tag.name, name_width))}")
     lines.append("")
-    lines.append(dim(f"{len(tags)} tag(s)"))
+    count = len(tags)
+    lines.append(dim(f"{count} {'tag' if count == 1 else 'tags'}"))
     return "\n".join(lines) + "\n"
 
 
 def render_stats_table(stats: CatalogStats) -> str:
-    rows = [
-        ("Recipes", str(stats.recipes)),
-        ("Favorites", str(stats.favorites)),
-        ("Want to cook", str(stats.want_to_cook)),
-        ("Tags", str(stats.tags)),
-        ("Recipes with images", str(stats.recipes_with_images)),
-        ("Recipes with links", str(stats.recipes_with_links)),
-    ]
-    return render_key_value_rows(rows)
+    label_width = 20
+    lines: list[str] = []
+
+    def plain_row(label: str, value: int) -> str:
+        return f"{dim(f'{label:<{label_width}}')}  {value}"
+
+    def bar_row(label: str, value: int, total: int) -> str:
+        pct = round(value / total * 100) if total else 0
+        bar = mini_bar(value, total, width=20)
+        return f"{dim(f'{label:<{label_width}}')}  {value:>4}  {bar}  {pct:>3}%"
+
+    lines.append(plain_row("Recipes", stats.recipes))
+    lines.append(bar_row("Favorites", stats.favorites, stats.recipes))
+    lines.append(bar_row("Want to cook", stats.want_to_cook, stats.recipes))
+    lines.append(plain_row("Tags", stats.tags))
+    lines.append(bar_row("With images", stats.recipes_with_images, stats.recipes))
+    lines.append(bar_row("With links", stats.recipes_with_links, stats.recipes))
+    return "\n".join(lines) + "\n"
 
 
 def render_doctor_report(result: DiscoveryResult, output_format: str) -> str:
     if output_format == "json":
         return json_dumps(result.to_json_dict())
-    rows = [
-        ("OK", yes_no(result.ok)),
-        ("Supported platform", yes_no(result.supported_platform)),
-        ("Bundle ID", result.bundle_id or "(not found)"),
-        ("Application group", result.application_group or "(not found)"),
-        ("App path", stringify_path(result.app_path)),
-        ("App path source", result.app_path_source),
-        ("App exists", yes_no(result.app_exists)),
-        ("DB path", stringify_path(result.db_path)),
-        ("DB path source", result.db_path_source),
-        ("DB exists", yes_no(result.db_exists)),
-        ("Support dir", stringify_path(result.support_dir)),
-        ("Support dir source", result.support_dir_source),
-        ("Support dir exists", yes_no(result.support_dir_exists)),
-        ("Compression tool", result.compression_tool),
-        ("Compression tool source", result.compression_tool_source),
-        ("Compression tool path", result.compression_tool_resolved_path or "(not found)"),
-        ("Compression tool available", yes_no(result.compression_tool_available)),
-        ("Can read catalog", yes_no(result.can_read_catalog)),
-        ("Can decode external images", yes_no(result.can_decode_external_images)),
-        ("Recipe count", str(result.recipe_count) if result.recipe_count is not None else "(unknown)"),
-    ]
-    if result.warnings:
-        rows.append(("Warnings", "\n".join(result.warnings)))
-    return render_key_value_rows(rows)
 
+    def check(v: bool) -> str:
+        return green("✓") if v else red("✗")
 
-def render_key_value_rows(rows: list[tuple[str, str]]) -> str:
-    width = max(len(label) for label, _ in rows)
+    W = 11  # len("Compression")
+
+    def lbl(s: str) -> str:
+        return bold(f"{s:<{W}}")
+
+    indent = " " * W
+
     lines: list[str] = []
-    for label, value in rows:
-        if "\n" in value:
-            first, *rest = value.splitlines()
-            lines.append(f"{dim(label):<{width}} : {first}")
-            for item in rest:
-                lines.append(f"{'':<{width}}   {item}")
-        else:
-            lines.append(f"{dim(f'{label:<{width}}')} : {value}")
+
+    # Platform
+    lines.append(f"{lbl('Platform')}  macOS  {check(result.supported_platform)}")
+    lines.append("")
+
+    # Path group
+    def path_row(label: str, path: object, source: str, exists: bool) -> None:
+        lines.append(f"{lbl(label)}  {stringify_path(path)}")
+        lines.append(f"{indent}  {dim(source)}  {check(exists)}")
+
+    path_row("App", result.app_path, result.app_path_source, result.app_exists)
+    path_row("Database", result.db_path, result.db_path_source, result.db_exists)
+    path_row("Support", result.support_dir, result.support_dir_source, result.support_dir_exists)
+    lines.append("")
+
+    # Compression
+    tool_path = result.compression_tool_resolved_path or dim("(not found)")
+    lines.append(
+        f"{lbl('Compression')}  {result.compression_tool} → {tool_path}  "
+        f"{dim(result.compression_tool_source)}  {check(result.compression_tool_available)}"
+    )
+    lines.append("")
+
+    # Catalog summary
+    count = str(result.recipe_count) if result.recipe_count is not None else dim("unknown")
+    catalog_parts = [
+        f"{count} recipes",
+        f"readable {check(result.can_read_catalog)}",
+        f"images {check(result.can_decode_external_images)}",
+    ]
+    lines.append(f"{lbl('Catalog')}  {'  ·  '.join(catalog_parts)}")
+
+    if result.warnings:
+        lines.append("")
+        for warning in result.warnings:
+            lines.append(f"{yellow('⚠')}  {warning}")
+
     return "\n".join(lines) + "\n"
 
 
 def stringify_path(path: object) -> str:
-    return str(path) if path else "(not found)"
+    return str(path) if path else dim("(not found)")
 
 
 def yes_no(value: bool) -> str:

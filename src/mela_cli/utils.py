@@ -27,6 +27,26 @@ def red(s: str) -> str:
     return f"\033[31m{s}\033[0m" if use_color() else s
 
 
+def cyan(s: str) -> str:
+    return f"\033[36m{s}\033[0m" if use_color() else s
+
+
+def yellow(s: str) -> str:
+    return f"\033[33m{s}\033[0m" if use_color() else s
+
+
+def section_rule(title: str, width: int = 50) -> str:
+    fill = max(width - len(title) - 4, 4)
+    return dim("── ") + bold(title) + dim(f" {'─' * fill}")
+
+
+def mini_bar(value: int, total: int, width: int = 20) -> str:
+    if total == 0:
+        return dim("░" * width)
+    filled = round(value / total * width)
+    return green("█" * filled) + dim("░" * (width - filled))
+
+
 def slugify(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     safe = "".join(character.lower() if character.isalnum() else "-" for character in normalized)

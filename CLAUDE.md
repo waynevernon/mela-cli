@@ -39,6 +39,33 @@ tests/
 - `search` is an alias for `list --query` — both route to `handle_list`, which uses `getattr(args, "query", None)` to handle both call shapes
 - Only add `dest=` to argparse args when the inferred name would be wrong (e.g. `--tag` → `dest="tags"` is necessary; `--output` → `dest="output"` is redundant)
 
+## Terminal output style
+
+All human-readable output lives in `formatters.py`. Color helpers are in `utils.py`. Never apply color to JSON, CSV, or Markdown output.
+
+### Color and styling utilities (`utils.py`)
+- `bold()`, `dim()`, `green()`, `red()`, `cyan()`, `yellow()` — ANSI helpers, no-ops when not a TTY or `NO_COLOR` is set
+- `section_rule(title)` — produces `── Title ──────────────────────────` headers used in recipe text view
+- `mini_bar(value, total, width=20)` — produces `████░░░░░░` bar charts used in stats and tags views
+- `use_color()` — gates all color: checks `sys.stdout.isatty()` and `NO_COLOR`
+
+### Critical rule: never format with ANSI-wrapped strings
+Python's f-string padding (`{s:<20}`) counts invisible ANSI escape chars toward the width. Always pad the plain string first, then apply color:
+```python
+# Wrong — padding is off because bold() wraps in escape codes
+f"{bold(label):<12}"
+
+# Correct — pad first, then color the padded string
+bold(f"{label:<12}")
+```
+
+### Output conventions per command
+- **`list`**: dim PK, single indicator column (`★` yellow for favorite, `◎` cyan for want-to-cook), bold title for favorites, cyan+dim tags. Header bold, rule dim.
+- **`show`**: bold title + dim full-width `─` rule, compact dim metadata lines with `·` separators (flags/tags, times, link/date), `section_rule()` headers, content indented 2 spaces.
+- **`tags`**: `mini_bar()` relative to max tag count, cyan tag names.
+- **`stats`**: `mini_bar()` with percentage for ratio fields (favorites, want-to-cook, with-images, with-links).
+- **`doctor`**: grouped sections (platform / paths / compression / catalog), bold labels padded to fixed width before coloring, `✓`/`✗` for status, `⚠` yellow for warnings.
+
 ## Hard rules
 
 - Never write to any Mela store path (`discovery.db_path` or anything under the group container)
